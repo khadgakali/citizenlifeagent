@@ -1164,6 +1164,7 @@ tr:hover td{background:var(--cream);}
         <div class="stat-card"><span class="lbl">यो महिनाको जम्मा First Premium</span><b id="ovMonthFirstPremium">रु. 0</b></div>
       </div>
       <div id="ovCommissionWarning" class="hidden" style="background:var(--crimson-tint); color:var(--crimson); padding:12px 16px; border-radius:10px; font-size:.86rem; margin-bottom:18px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></div>
+      <div id="ovCommissionDataWarning" class="hidden" style="background:var(--crimson-tint); color:var(--crimson); padding:12px 16px; border-radius:10px; font-size:.86rem; margin-bottom:18px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></div>
       <div class="panel">
         <div class="panel-head"><h3><i class="fa-solid fa-calculator"></i> यो महिना कमिसन — योजना प्रकार अनुसार समूहगत विवरण</h3></div>
         <div class="table-scroll"><table>
@@ -2401,8 +2402,34 @@ function renderYearlyBreakdown_(rows){
 // त्यसैले पूरा इतिहास (जति पुरानो भए पनि) सधैं सही देखिन्छ, केवल हालको स्नेपसट
 // मात्र होइन। insuranceStart अझै नभरिएका पुराना ग्राहकका लागि matra (backward
 // compatibility) अन्तिम किस्ता मात्र lastPaidDate बाट अनुमानित देखाइन्छ।
+//
+// महत्त्वपूर्ण: "Paid Premium Count" Sheet को एउटा छुट्टै स्तम्भ हो जुन agent
+// ले हरेक भुक्तानीपछि हातले बढाउनुपर्छ -- व्यवहारमा प्रायः agent ले यो
+// नियमित रूपमा अपडेट गर्दैनन् (किनभने insuranceStart/renewDate जस्ता अरू
+// स्तम्भबाटै यो जानकारी derive गर्न सकिन्छ)। त्यो स्तम्भ खाली/0 भएकै कारण
+// यो function ले सधैं [] फर्काउँदा, ती ग्राहकको कमिसन/व्यवसाय कहिल्यै
+// गनिँदैनथ्यो (जुन वास्तविक समस्या थियो)। त्यसैले अब paidPremiumCount खाली/0
+// भए तर insuranceStart भरिएको भए, आजसम्म कति वार्षिकोत्सव (anniversary)
+// बितिसक्यो भन्नबाटै कति किस्ता तिरिसकेको मान्न मिल्छ भनेर आफैं अनुमान
+// गरिन्छ (term भरिएको भए त्योभन्दा बढी अनुमान गरिँदैन, term नाघेपछि पोलिसी
+// नै म्याद सकिने भएकोले)। Sheet मा paidPremiumCount स्पष्ट भरिएको भए भने
+// चाहिं त्यही (agent को आधिकारिक गणना) सधैं प्राथमिकता पाउँछ, यो अनुमान
+// कहिल्यै ओभरराइट गर्दैन।
 function installmentDatesForCustomer_(c){
-  const count = Number(c.paidPremiumCount) || 0;
+  let count = Number(c.paidPremiumCount) || 0;
+  if(count < 1 && c.insuranceStart){
+    const start = new Date(c.insuranceStart);
+    if(!isNaN(start.getTime())){
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      const hadAnniversaryThisYear = (now.getMonth() > start.getMonth()) ||
+        (now.getMonth() === start.getMonth() && now.getDate() >= start.getDate());
+      if(!hadAnniversaryThisYear) years--;
+      count = Math.max(0, years) + 1; // सुरुवाती (वर्ष १) किस्ता + बितिसकेका थप वार्षिकोत्सव
+      const term = Number(c.term) || 0;
+      if(term > 0) count = Math.min(count, term); // पोलिसीको कुल अवधिभन्दा बढी अनुमान नगर्ने
+    }
+  }
   if(count < 1) return [];
   if(c.insuranceStart){
     const list = [];
@@ -4463,6 +4490,24 @@ function renderOverview(){
         `${duePending.length} ग्राहकको नविकरण ड्यु छ तर यो महिनाको भुक्तान अझै रेकर्ड गरिएको छैन (माथिको कमिसन जोडमा समावेश छैन): ${duePending.map(c=>c.name).join(", ")}। भुक्तान संकलन गरेपछि ग्राहक तालिकामा "भुक्तान भयो" थिच्नुहोस्, वा Sheet मा तिरिसकेको प्रिमियम संख्या/अन्तिम भुक्तान मिति सिधै अपडेट गर्नुहोस्।`;
     } else {
       warnBox.classList.add("hidden");
+    }
+  }
+
+  // कमिसन ट्रेन्ड/तालिका किन खाली देखिन सक्छ भन्ने स्पष्ट कारण — प्रिमियम भएका तर
+  // "बीमा योजना प्रकार" वा "मुनाफामा सहभागिता" अपुष्ट (खाली/नमिलेको) भएका ग्राहक
+  // कहिल्यै अनुमान गरेर commission देखाइँदैन (computeCommissionForYear_ हेर्नुहोस्),
+  // त्यसैले यहाँ स्पष्ट रूपमा देखाइन्छ, चुपचाप हराउनुको सट्टा।
+  const missingCommissionFieldsCustomers = customers.filter(c =>
+    (Number(c.premium)||0) > 0 && !isSinglePremiumCustomer_(c) && (!c.schemeCategory || !c.participating)
+  );
+  const dataWarnBox = document.getElementById("ovCommissionDataWarning");
+  if(dataWarnBox){
+    if(missingCommissionFieldsCustomers.length){
+      dataWarnBox.classList.remove("hidden");
+      dataWarnBox.querySelector("span").textContent =
+        `${missingCommissionFieldsCustomers.length} ग्राहकको "बीमा योजना प्रकार" वा "मुनाफामा सहभागिता" अपुष्ट छ, त्यसैले तिनको कमिसन गणना गरिएको छैन (कमिसन ट्रेन्ड/तालिकामा देखिँदैन): ${missingCommissionFieldsCustomers.map(c=>c.name).join(", ")}। Sheet को स्तम्भ ठ्याक्कै मिलेको छ/छैन जाँच्नुहोस्, वा ग्राहक फारममा यी दुई फिल्ड भर्नुहोस्।`;
+    } else {
+      dataWarnBox.classList.add("hidden");
     }
   }
 
