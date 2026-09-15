@@ -982,19 +982,14 @@ tr:hover td{background:var(--cream);}
 
       <!-- Admin login -->
       <div id="loginAdmin" class="hidden">
-        <h3 style="margin-bottom:4px;">Agent Login</h3>
-        <p style="color:var(--ink-soft); font-size:.86rem; margin-bottom:18px;">आफ्नो Agent ID र जन्ममिति प्रयोग गरी ड्यासबोर्डमा प्रवेश गर्नुहोस्।</p>
+        <h3 style="margin-bottom:4px;">Admin Login</h3>
+        <p style="color:var(--ink-soft); font-size:.86rem; margin-bottom:18px;">आफ्नो अधिकृत Google खाताबाट Sign in गरी ड्यासबोर्डमा प्रवेश गर्नुहोस्।</p>
         <div id="adminErr" class="auth-error hidden"></div>
-        <div class="field" style="margin-bottom:14px;"><label>Agent ID</label><input id="adminAgentId" placeholder="Agent ID लेख्नुहोस्"></div>
-        <div class="field" style="margin-bottom:18px;">
-          <label>जन्ममिति</label>
-          <div class="date-toggle-tabs">
-            <button type="button" class="active" onclick="setDateMode('adminDob','bs',this)">वि.सं. (BS)</button>
-            <button type="button" onclick="setDateMode('adminDob','ad',this)">AD</button>
-          </div>
-          <input id="adminDob" type="text" data-mode="bs" placeholder="जन्ममिति लेख्नुहोस्">
-        </div>
-        <button class="btn block" onclick="adminLogin()">Login</button>
+        <button class="btn block" onclick="adminLogin()" style="display:flex; align-items:center; justify-content:center; gap:10px;">
+          <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.6 3 24 3 12.4 3 3 12.4 3 24s9.4 21 21 21 21-9.4 21-21c0-1.4-.1-2.8-.4-4.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.6 18.9 12 24 12c3.1 0 5.8 1.1 8 3l6-6C34.5 5.1 29.6 3 24 3 15.9 3 8.9 7.6 6.3 14.7z"/><path fill="#4CAF50" d="M24 45c5.5 0 10.4-1.9 14.2-5.1l-6.6-5.4C29.6 36.2 26.9 37 24 37c-5.2 0-9.6-3.3-11.3-8l-6.6 5.1C8.9 40.4 15.9 45 24 45z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.6 5.4C41.5 35.6 45 30.3 45 24c0-1.4-.1-2.8-.4-4.5z"/></svg>
+          Google बाट Sign in गर्नुहोस्
+        </button>
+        <p style="color:var(--ink-soft); font-size:.78rem; margin-top:12px;">केवल अधिकृत (whitelisted) Google खाताले मात्र प्रवेश पाउँछ — अरू खाताले "अनाधिकृत" त्रुटि देख्नेछन्।</p>
       </div>
     </div>
   </div>
@@ -1164,6 +1159,7 @@ tr:hover td{background:var(--cream);}
         <div class="stat-card"><span class="lbl">यो महिनाको जम्मा First Premium</span><b id="ovMonthFirstPremium">रु. 0</b></div>
       </div>
       <div id="ovCommissionWarning" class="hidden" style="background:var(--crimson-tint); color:var(--crimson); padding:12px 16px; border-radius:10px; font-size:.86rem; margin-bottom:18px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></div>
+      <div id="ovCommissionDataWarning" class="hidden" style="background:var(--crimson-tint); color:var(--crimson); padding:12px 16px; border-radius:10px; font-size:.86rem; margin-bottom:18px; display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-triangle-exclamation"></i> <span></span></div>
       <div class="panel">
         <div class="panel-head"><h3><i class="fa-solid fa-calculator"></i> यो महिना कमिसन — योजना प्रकार अनुसार समूहगत विवरण</h3></div>
         <div class="table-scroll"><table>
@@ -1577,6 +1573,7 @@ tr:hover td{background:var(--cream);}
 </script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-analytics-compat.js"></script>
 
 <script>
@@ -1623,6 +1620,17 @@ const CONFIG = {
 // नोट (सुरक्षा): यहाँ वा अन्य कुनै फ्रन्ट-एन्ड फाइलमा कुनै Agent ID/Policy Number र जन्ममिति
 // (login credential) राखिएको छैन। पहिचान प्रमाणीकरण (authentication) सधैं Apps Script
 // backend मार्फत मात्र हुन्छ — हेर्नुहोस् customerLogin()/adminLogin() र सम्बन्धित सर्भर action।
+
+// Admin login अब Firebase Authentication (Google Sign-In) प्रयोग गर्छ। यो सूचीले
+// UI तुरुन्तै (client-side) कसलाई admin देखाउने भनेर छिटो छान्छ, तर वास्तविक सुरक्षा
+// यहाँ होइन — हरेक admin-मात्र लेखन (add/update/delete/notify) अनुरोधमा Firebase ID
+// token पठाइन्छ र backend (Latest_Code.gs -> verifyAdminIdToken_/requireAdmin_) ले
+// यही UID सूचीविरुद्ध फेरि जाँच्छ। UID थप्न/हटाउन दुवैतिर (यहाँ र Latest_Code.gs को
+// ADMIN_UIDS_) उस्तै राख्नुहोस् — Firebase Console -> Authentication -> Users बाट UID पाइन्छ।
+const ADMIN_UIDS = [
+  "G0naQVlxwrQ5aXttGTpJUic1onD3", // bikasgurung120@gmail.com
+  "OWpq9VJzsCbUZtQ74MIX9kAWFTz1", // bikasgurung@khadgakalischool.edu.np
+];
 
 // होमपेजमा देखिने स्थिर (static) तथ्याङ्क — यसमा database query जाँदैन, सिधै यहीँबाट सम्पादन गर्नुहोस्।
 const SITE_STATS = {
@@ -2401,8 +2409,34 @@ function renderYearlyBreakdown_(rows){
 // त्यसैले पूरा इतिहास (जति पुरानो भए पनि) सधैं सही देखिन्छ, केवल हालको स्नेपसट
 // मात्र होइन। insuranceStart अझै नभरिएका पुराना ग्राहकका लागि matra (backward
 // compatibility) अन्तिम किस्ता मात्र lastPaidDate बाट अनुमानित देखाइन्छ।
+//
+// महत्त्वपूर्ण: "Paid Premium Count" Sheet को एउटा छुट्टै स्तम्भ हो जुन agent
+// ले हरेक भुक्तानीपछि हातले बढाउनुपर्छ -- व्यवहारमा प्रायः agent ले यो
+// नियमित रूपमा अपडेट गर्दैनन् (किनभने insuranceStart/renewDate जस्ता अरू
+// स्तम्भबाटै यो जानकारी derive गर्न सकिन्छ)। त्यो स्तम्भ खाली/0 भएकै कारण
+// यो function ले सधैं [] फर्काउँदा, ती ग्राहकको कमिसन/व्यवसाय कहिल्यै
+// गनिँदैनथ्यो (जुन वास्तविक समस्या थियो)। त्यसैले अब paidPremiumCount खाली/0
+// भए तर insuranceStart भरिएको भए, आजसम्म कति वार्षिकोत्सव (anniversary)
+// बितिसक्यो भन्नबाटै कति किस्ता तिरिसकेको मान्न मिल्छ भनेर आफैं अनुमान
+// गरिन्छ (term भरिएको भए त्योभन्दा बढी अनुमान गरिँदैन, term नाघेपछि पोलिसी
+// नै म्याद सकिने भएकोले)। Sheet मा paidPremiumCount स्पष्ट भरिएको भए भने
+// चाहिं त्यही (agent को आधिकारिक गणना) सधैं प्राथमिकता पाउँछ, यो अनुमान
+// कहिल्यै ओभरराइट गर्दैन।
 function installmentDatesForCustomer_(c){
-  const count = Number(c.paidPremiumCount) || 0;
+  let count = Number(c.paidPremiumCount) || 0;
+  if(count < 1 && c.insuranceStart){
+    const start = new Date(c.insuranceStart);
+    if(!isNaN(start.getTime())){
+      const now = new Date();
+      let years = now.getFullYear() - start.getFullYear();
+      const hadAnniversaryThisYear = (now.getMonth() > start.getMonth()) ||
+        (now.getMonth() === start.getMonth() && now.getDate() >= start.getDate());
+      if(!hadAnniversaryThisYear) years--;
+      count = Math.max(0, years) + 1; // सुरुवाती (वर्ष १) किस्ता + बितिसकेका थप वार्षिकोत्सव
+      const term = Number(c.term) || 0;
+      if(term > 0) count = Math.min(count, term); // पोलिसीको कुल अवधिभन्दा बढी अनुमान नगर्ने
+    }
+  }
   if(count < 1) return [];
   if(c.insuranceStart){
     const list = [];
@@ -2533,6 +2567,15 @@ async function apiCall(action, payload, timeoutMs){
     console.error(`[apiCall:${action}] CONFIG.APPS_SCRIPT_URL सेट गरिएको छैन।`);
     return { ok:false, networkError:true, error:"Backend URL configured छैन।" };
   }
+  payload = payload || {};
+  // Admin session भए, हरेक अनुरोधमा ताजा Firebase ID token जोड्छ (backend को
+  // requireAdmin_() ले यही token जाँच्छ) — बासी token ले admin-मात्र action
+  // (add/update/delete/notify) मा अनपेक्षित "Unauthorized" नआओस् भनेर getIdToken()
+  // ले आवश्यक परे मात्र नयाँ token ल्याउँछ (Firebase SDK आफैं cache/refresh गर्छ)।
+  if(session.role === "admin" && !payload.idToken && fbAuth && fbAuth.currentUser){
+    try{ payload = { ...payload, idToken: await fbAuth.currentUser.getIdToken() }; }
+    catch(tokenErr){ console.warn(`[apiCall:${action}] idToken लिन असफल:`, tokenErr); }
+  }
   const controller = new AbortController();
   const timer = setTimeout(()=>controller.abort(), timeoutMs || 15000); // 15 सेकेन्डभित्र जवाफ नआए रोकिन्छ
   const startedAt = performance.now();
@@ -2555,7 +2598,7 @@ async function apiCall(action, payload, timeoutMs){
     // तर हामीले पठाएको action अनुसारको data key (customers/items/prospects/targets/stats) आएन)
     // भने console मा स्पष्ट चेतावनी देखाउँछ — यसले Apps Script सम्म POST body पुगेको छैन भन्ने संकेत गर्छ।
     const looksLikeHealthCheck = json && typeof json.message === "string" && json.ok === true && !("customers" in json) && !("items" in json) && !("prospects" in json) && !("targets" in json) && !("stats" in json) && !("customer" in json);
-    if(looksLikeHealthCheck && action !== "customerLogin" && action !== "agentLogin"){
+    if(looksLikeHealthCheck && action !== "customerLogin" && action !== "adminVerify"){
       console.warn(`[apiCall:${action}] (${elapsed}ms) जवाफमा expected data भेटिएन, बरु health-check जस्तो जवाफ आयो। सम्भावित कारण: browser को fetch POST, Apps Script को redirect पछि GET मा परिवर्तन भइरहेको हुन सक्छ (doPost को सट्टा doGet चलिरहेको)। Raw response:`, json);
       return { ok:false, networkError:true, error:"Backend सँग सही तरिकाले जडान भएन (unexpected response)।" };
     }
@@ -2594,7 +2637,9 @@ async function apiCall(action, payload, timeoutMs){
    कुनै पनि लेखन (write) कार्य सधैं जस्तै अघि नै apiCall() (Apps Script) मार्फत
    हुन्छ — त्यो यहाँ परिवर्तन गरिएको छैन।
    ============================================================ */
-let fbApp = null, fbDb = null;
+let fbApp = null, fbDb = null, fbAuth = null;
+let authReadyResolve_;
+const authReady = new Promise(res => { authReadyResolve_ = res; });
 function initFirebase(){
   if(fbDb) return fbDb; // पहिले नै initialize भइसकेको छ
   if(!CONFIG.FIREBASE_CONFIG || !CONFIG.FIREBASE_CONFIG.databaseURL || typeof firebase === "undefined"){
@@ -2604,6 +2649,18 @@ function initFirebase(){
   try{
     fbApp = firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
     fbDb = firebase.database();
+    if(firebase.auth){
+      fbAuth = firebase.auth();
+      // पहिलो पटक Firebase आफैंले (localStorage मार्फत) पहिलेको Google login
+      // पुनर्स्थापित गर्ने प्रयास गर्छ — त्यो टुंगिएपछि मात्र authReady पूरा हुन्छ,
+      // ताकि apiCall() ले हतार गरेर "लगइन छैन" भन्दै admin idToken छुटाउने नहोस्।
+      const unsub = fbAuth.onAuthStateChanged(user => {
+        unsub();
+        authReadyResolve_(user);
+      }, err => { console.warn("[Firebase Auth] onAuthStateChanged त्रुटि:", err); authReadyResolve_(null); });
+    } else {
+      authReadyResolve_(null);
+    }
     // Analytics ऐच्छिक हो — SDK लोड नभए वा ब्राउजरले ब्लक गरे (जस्तै privacy
     // extension) पनि बाँकी site (Firebase database) सामान्य रूपमै चल्नुपर्छ,
     // त्यसैले यसलाई छुट्टै try/catch मा राखिएको छ।
@@ -2617,6 +2674,7 @@ function initFirebase(){
     return fbDb;
   }catch(err){
     console.error("[Firebase] initialize असफल भयो:", err);
+    authReadyResolve_(null);
     return null;
   }
 }
@@ -2753,7 +2811,17 @@ async function handleRoute(){
   const [route, param] = raw.split("/");
 
   if(route === "admin"){
-    if(session.role !== "admin"){ showView("view-login"); setLoginTab("admin"); return; }
+    await authReady; // पेज रिफ्रेस भएपछि Firebase ले पहिलेको Google login फर्काउन्जेल पर्खन्छ
+    const fbUser = fbAuth && fbAuth.currentUser;
+    const stillValidAdmin = session.role === "admin" && fbUser && ADMIN_UIDS.includes(fbUser.uid);
+    if(!stillValidAdmin){
+      if(session.role === "admin"){ // localStorage मा admin भनिए पनि Google session अब मान्य छैन
+        session = {role:null, customerId:null, customer:null};
+        clearPersistedSession();
+        updateNavAuthUI();
+      }
+      showView("view-login"); setLoginTab("admin"); return;
+    }
     showLoading("ड्यासबोर्ड लोड हुँदैछ...");
     try{ await loadAdminData(); } finally { hideLoading(); }
     showView("view-admin");
@@ -2804,12 +2872,16 @@ function setLoginTab(tab){
 }
 // यही एक मात्र ठाउँ हो जसले वास्तवमा लगआउट (session मेटाउने) गर्छ।
 function logout(){
+  const wasAdmin = session.role === "admin";
   session = { role:null, customerId:null, customer:null };
   clearPersistedSession();
   NOTIFICATIONS = [];
   renderNotifBadge_();
   updateNavAuthUI();
   navigateTo("home");
+  if(wasAdmin && fbAuth){
+    fbAuth.signOut().catch(err => console.warn("[Firebase Auth] Sign out असफल:", err));
+  }
 }
 function scrollToId(id){ document.getElementById(id).scrollIntoView({behavior:"smooth"}); }
 
@@ -2910,40 +2982,54 @@ async function customerLogin(){
 }
 
 /* ---------- Admin login ----------
-   प्रमाणीकरण मोडेल: Agent ID + जन्ममिति (वि.सं. वा AD) = password।
-   वास्तविक प्रमाणीकरण Apps Script "agentLogin" action मार्फत Agents Sheet विरुद्ध हुन्छ। */
+   प्रमाणीकरण मोडेल: Firebase Authentication (Google Sign-In)। Google ले नै पासवर्ड
+   सम्हाल्छ — यहाँ कुनै custom password/DOB राखिँदैन। Sign-in पछि फर्किएको UID
+   backend (Latest_Code.gs -> ADMIN_UIDS_) विरुद्ध पुनः जाँचिन्छ, ताकि जोसुकैले
+   Google खाता भए पनि होइन, केवल अधिकृत व्यक्तिले मात्र ड्यासबोर्ड पाओस्। */
 async function adminLogin(){
-  const agentId = document.getElementById("adminAgentId").value.trim();
-  const dobInput = document.getElementById("adminDob");
-  const dob = dobInput.value.trim();
-  const dobMode = dobInput.dataset.mode === "ad" ? "ad" : "bs";
   const errBox = document.getElementById("adminErr");
   errBox.classList.add("hidden");
 
-  if(!agentId || !dob){
-    errBox.textContent = "कृपया Agent ID र जन्ममिति दुवै भर्नुहोस्।";
+  const db = initFirebase();
+  if(!db || !fbAuth){
+    errBox.textContent = "Firebase Authentication लोड हुन सकेन। पेज रिफ्रेस गरी फेरि प्रयास गर्नुहोस्।";
     errBox.classList.remove("hidden");
     return;
   }
 
-  showLoading("प्रमाणीकरण गरिँदैछ...");
+  showLoading("Google बाट Sign in गरिँदैछ...");
+  let cred, idToken;
+  try{
+    const provider = new firebase.auth.GoogleAuthProvider();
+    cred = await fbAuth.signInWithPopup(provider);
+    idToken = await cred.user.getIdToken();
+  }catch(err){
+    hideLoading();
+    if(err && err.code === "auth/popup-closed-by-user"){ return; } // प्रयोगकर्ताले आफैं बन्द गर्‍यो — त्रुटि देखाउनु पर्दैन
+    errBox.textContent = "Google Sign-in असफल भयो: " + (err && err.message ? err.message : "अज्ञात त्रुटि");
+    errBox.classList.remove("hidden");
+    return;
+  }
+
+  // Client-side (ADMIN_UIDS) चाँडो जाँच, अनि backend (requireAdmin_) मार्फत पक्का जाँच — दुवै मिल्नुपर्छ।
   let remote;
   try{
-    remote = await apiCall("agentLogin", {agentId, dob, dobMode});
+    if(!ADMIN_UIDS.includes(cred.user.uid)){
+      remote = { ok:false, error:"यो Google खाता Admin होइन (अनाधिकृत)।" };
+    } else {
+      remote = await apiCall("adminVerify", { idToken });
+    }
   } finally {
     hideLoading();
   }
 
-  if(remote && remote.networkError){
-    errBox.textContent = remote.error || "Backend सँग जडान हुन सकेन। पछि फेरि प्रयास गर्नुहोस्।";
-    errBox.classList.remove("hidden");
-    return;
-  }
   if(!remote || !remote.ok){
-    errBox.textContent = "Agent ID वा जन्ममिति मिलेन।";
+    await fbAuth.signOut(); // अनाधिकृत खातालाई साइन-इन गरेको राख्नु हुँदैन
+    errBox.textContent = (remote && remote.error) ? remote.error : "यो Google खाता Admin होइन (अनाधिकृत)।";
     errBox.classList.remove("hidden");
     return;
   }
+
   session = {role:"admin", customerId:null, customer:null};
   persistSession();
   updateNavAuthUI();
@@ -4466,6 +4552,24 @@ function renderOverview(){
     }
   }
 
+  // कमिसन ट्रेन्ड/तालिका किन खाली देखिन सक्छ भन्ने स्पष्ट कारण — प्रिमियम भएका तर
+  // "बीमा योजना प्रकार" वा "मुनाफामा सहभागिता" अपुष्ट (खाली/नमिलेको) भएका ग्राहक
+  // कहिल्यै अनुमान गरेर commission देखाइँदैन (computeCommissionForYear_ हेर्नुहोस्),
+  // त्यसैले यहाँ स्पष्ट रूपमा देखाइन्छ, चुपचाप हराउनुको सट्टा।
+  const missingCommissionFieldsCustomers = customers.filter(c =>
+    (Number(c.premium)||0) > 0 && !isSinglePremiumCustomer_(c) && (!c.schemeCategory || !c.participating)
+  );
+  const dataWarnBox = document.getElementById("ovCommissionDataWarning");
+  if(dataWarnBox){
+    if(missingCommissionFieldsCustomers.length){
+      dataWarnBox.classList.remove("hidden");
+      dataWarnBox.querySelector("span").textContent =
+        `${missingCommissionFieldsCustomers.length} ग्राहकको "बीमा योजना प्रकार" वा "मुनाफामा सहभागिता" अपुष्ट छ, त्यसैले तिनको कमिसन गणना गरिएको छैन (कमिसन ट्रेन्ड/तालिकामा देखिँदैन): ${missingCommissionFieldsCustomers.map(c=>c.name).join(", ")}। Sheet को स्तम्भ ठ्याक्कै मिलेको छ/छैन जाँच्नुहोस्, वा ग्राहक फारममा यी दुई फिल्ड भर्नुहोस्।`;
+    } else {
+      dataWarnBox.classList.add("hidden");
+    }
+  }
+
   renderCommissionChart();
   renderPremiumChart();
 
@@ -4660,6 +4764,7 @@ applyPageContent();
 renderAboutCards();
 renderWhyItems();
 renderPlans();
+initFirebase(); // Firebase Auth (Admin Google Sign-In) लगायत सुरुमै initialize गर्छ, ताकि पेज रिफ्रेस हुँदा पनि admin route guard ले authReady समयमै पाओस्
 renderRiders();
 renderFeaturedVideos();
 renderFaq();
